@@ -15,16 +15,15 @@ export default function FormularioInstalacao() {
           Instalado
         </span>
         <p className="small">
-          Banco criado com {estado.pronto.medicos} médicos de exemplo, dois deles em análise.
+          Banco criado com {estado.pronto.unidades} unidades de exemplo, vagas abertas e alguns
+          agendamentos.
         </p>
+        <p className="small">Entre com um destes CPFs e a senha {estado.pronto.senha}:</p>
         <p className="small mono">
-          admin@clinicaaberta.com.br
+          111.444.777-35 — secretaria
           <br />
-          helena@corevida.com.br
-          <br />
-          ana@exemplo.com.br
+          529.982.247-25 — morador
         </p>
-        <p className="small muted">Senha das três: {estado.pronto.senha}</p>
         <Link className="btn" href="/">
           Abrir o sistema
         </Link>

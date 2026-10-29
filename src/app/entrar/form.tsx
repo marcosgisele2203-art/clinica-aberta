@@ -3,14 +3,21 @@
 import { useActionState } from "react";
 import { entrar, type EstadoAuth } from "@/lib/auth-actions";
 
-export default function FormularioEntrar() {
+export default function FormularioEntrar({ proximo }: { proximo: string }) {
   const [estado, enviar, enviando] = useActionState<EstadoAuth, FormData>(entrar, {});
 
   return (
     <form action={enviar} className="card grid" style={{ gap: 14 }}>
+      <input type="hidden" name="proximo" value={proximo} />
       <label className="f">
-        E-mail
-        <input name="email" type="email" required autoComplete="email" placeholder="voce@exemplo.com.br" />
+        CPF
+        <input
+          name="cpf"
+          required
+          inputMode="numeric"
+          autoComplete="username"
+          placeholder="000.000.000-00"
+        />
       </label>
       <label className="f">
         Senha

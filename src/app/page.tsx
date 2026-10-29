@@ -1,124 +1,98 @@
 import Link from "next/link";
 import { db } from "@/lib/db";
-import { CartaoMedico } from "@/components/ui";
-import { CONVENIOS, ESPECIALIDADES, PLANOS, brl } from "@/lib/domain";
+import { CartaoUnidade } from "@/components/ui";
+import { ESPECIALIDADES } from "@/lib/domain";
 
-// Lê o banco a cada acesso: nada de consultar na hora do build, quando as tabelas
-// ainda podem não existir.
 export const dynamic = "force-dynamic";
 
 export default async function Inicio() {
-  const destaques = await db.medico.findMany({
-    where: { status: "APROVADO" },
-    include: { user: { select: { nome: true } } },
-    orderBy: { publicadoEm: "desc" },
+  const unidades = await db.unidade.findMany({
+    where: { ativa: true },
+    include: { disponibilidades: { where: { ativa: true }, select: { especialidade: true } } },
+    orderBy: { nome: "asc" },
     take: 3,
   });
+
+  const lista = unidades.map((u) => ({
+    ...u,
+    especialidades: [...new Set(u.disponibilidades.map((d) => d.especialidade))].sort(),
+  }));
 
   return (
     <div className="view">
       <section className="hero">
-        <p className="eyebrow">Consultórios e clínicas verificados pelo CRM</p>
-        <h1>O consultório do seu médico, aberto na internet</h1>
+        <p className="eyebrow">Secretaria Municipal de Saúde</p>
+        <h1>Marque sua consulta no posto sem precisar ir até lá</h1>
         <p className="lead">
-          O médico cadastra a clínica, define os horários e recebe agendamentos direto na página. O
-          paciente procura por especialidade e cidade, vê o valor da consulta e marca em dois toques.
+          Escolha a unidade, a especialidade e o dia. Você recebe um número de protocolo e é só
+          chegar no turno marcado com documento e cartão SUS. Sem fila na madrugada para pegar
+          ficha.
         </p>
-        <form action="/buscar" className="searchbar">
-          <label className="f">
-            Especialidade
-            <select name="esp" defaultValue="">
-              <option value="">Todas</option>
-              {ESPECIALIDADES.map((e) => (
-                <option key={e}>{e}</option>
-              ))}
-            </select>
-          </label>
-          <label className="f">
-            Cidade
-            <input name="cidade" placeholder="Campo Grande, Curitiba…" />
-          </label>
-          <label className="f">
-            Convênio
-            <select name="convenio" defaultValue="">
-              <option value="">Qualquer</option>
-              {CONVENIOS.map((c) => (
-                <option key={c}>{c}</option>
-              ))}
-            </select>
-          </label>
-          <button className="btn" type="submit">
-            Buscar médicos
-          </button>
-        </form>
+        <div className="row">
+          <Link className="btn" href="/unidades">
+            Ver unidades e vagas
+          </Link>
+          <Link className="btn ghost" href="/criar-conta">
+            Fazer meu cadastro
+          </Link>
+        </div>
       </section>
 
       <section className="grid cols-3">
         <div className="card">
-          <h3>Para o paciente</h3>
+          <p className="mono" style={{ color: "var(--sand)", fontSize: 13 }}>01</p>
+          <h3 style={{ marginTop: 4 }}>Cadastre-se com o CPF</h3>
           <p className="muted small" style={{ marginTop: 6 }}>
-            Busca por especialidade, cidade e convênio, com valor da consulta e endereço completo
-            antes de marcar.
+            Uma vez só. Depois é só entrar com CPF e senha para marcar quantas vezes precisar.
           </p>
         </div>
         <div className="card">
-          <h3>Para o médico</h3>
+          <p className="mono" style={{ color: "var(--sand)", fontSize: 13 }}>02</p>
+          <h3 style={{ marginTop: 4 }}>Escolha unidade e dia</h3>
           <p className="muted small" style={{ marginTop: 6 }}>
-            Cadastro com CRM, página pública da clínica, agenda com duração de consulta configurável
-            e painel de atendimentos.
+            O site mostra quantas vagas restam em cada turno. Se acabou, aparece o próximo dia com
+            vaga.
           </p>
         </div>
         <div className="card">
-          <h3>Para quem administra</h3>
+          <p className="mono" style={{ color: "var(--sand)", fontSize: 13 }}>03</p>
+          <h3 style={{ marginTop: 4 }}>Guarde o protocolo</h3>
           <p className="muted small" style={{ marginTop: 6 }}>
-            Fila de aprovação dos cadastros e cobrança mensal por plano. Nada entra no ar sem passar
-            pela análise.
+            Apresente o número na recepção. Se não puder ir, cancele pelo site para liberar a vaga
+            para outra pessoa.
           </p>
         </div>
       </section>
 
-      {destaques.length > 0 && (
+      {lista.length > 0 && (
         <section>
           <div className="row between" style={{ marginBottom: 12 }}>
-            <h2>Clínicas no ar</h2>
-            <Link className="btn ghost sm" href="/buscar">
+            <h2>Unidades</h2>
+            <Link className="btn ghost sm" href="/unidades">
               Ver todas
             </Link>
           </div>
           <div className="grid cols-3">
-            {destaques.map((m) => (
-              <CartaoMedico key={m.id} medico={m} />
+            {lista.map((u) => (
+              <CartaoUnidade key={u.id} unidade={u} />
             ))}
           </div>
         </section>
       )}
 
-      <section>
-        <div className="row between" style={{ marginBottom: 12 }}>
-          <h2>Planos para o médico</h2>
-          <Link className="btn sm" href="/medico/cadastro">
-            Cadastrar minha clínica
-          </Link>
-        </div>
-        <div className="grid cols-3">
-          {PLANOS.map((p) => (
-            <div key={p.nome} className={p.nome === "Profissional" ? "plan featured" : "plan"}>
-              {p.nome === "Profissional" && (
-                <span className="pill ok" style={{ justifySelf: "start" }}>
-                  Mais escolhido
-                </span>
-              )}
-              <h3>{p.nome}</h3>
-              <p className="p">
-                {brl(p.centavos)} <span className="muted" style={{ fontSize: 14 }}>/mês</span>
-              </p>
-              <p className="small muted">{p.resumo}</p>
-              <Link className={p.nome === "Profissional" ? "btn" : "btn ghost"} href={`/medico/cadastro?plano=${p.nome}`}>
-                Começar com o {p.nome}
-              </Link>
-            </div>
+      <section className="card">
+        <p className="eyebrow">O que dá para marcar</p>
+        <div className="chips" style={{ marginTop: 10 }}>
+          {ESPECIALIDADES.map((e) => (
+            <Link className="chip" key={e} href={`/unidades?especialidade=${encodeURIComponent(e)}`}>
+              {e}
+            </Link>
           ))}
         </div>
+        <p className="small muted" style={{ marginTop: 14 }}>
+          Urgência e emergência não entram no agendamento: o pronto atendimento continua por ordem
+          de chegada, 24 horas.
+        </p>
       </section>
     </div>
   );

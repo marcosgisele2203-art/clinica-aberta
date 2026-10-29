@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import "./globals.css";
 import { sessaoAtual } from "@/lib/session";
+import { primeiroNome } from "@/lib/domain";
 
 export const metadata: Metadata = {
-  title: "Clínica Aberta",
-  description: "Cadastre sua clínica, publique sua agenda e receba agendamentos online.",
+  title: "Agenda Saúde",
+  description: "Agendamento de consultas nas unidades de saúde do município.",
 };
 
 export default async function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,16 +25,15 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <header className="bar">
           <div className="wrap bar-in">
             <Link className="brand" href="/">
-              <span className="mark">✚</span>Clínica Aberta
+              <span className="mark">✚</span>Agenda Saúde
             </Link>
             <nav className="tabs">
-              <Link href="/buscar">Buscar médico</Link>
-              {sessao?.role === "MEDICO" && <Link href="/medico">Minha agenda</Link>}
-              {sessao?.role === "ADMIN" && <Link href="/admin">Admin</Link>}
-              {!sessao && <Link href="/medico/cadastro">Cadastrar clínica</Link>}
+              <Link href="/unidades">Unidades</Link>
+              {sessao?.role === "CIDADAO" && <Link href="/meus-agendamentos">Meus agendamentos</Link>}
+              {sessao?.role === "SECRETARIA" && <Link href="/secretaria">Secretaria</Link>}
               {sessao ? (
                 <form action="/sair" method="post">
-                  <button type="submit">Sair ({sessao.nome.split(" ")[0]})</button>
+                  <button type="submit">Sair ({primeiroNome(sessao.nome)})</button>
                 </form>
               ) : (
                 <Link href="/entrar">Entrar</Link>
@@ -44,7 +44,8 @@ export default async function RootLayout({ children }: { children: React.ReactNo
         <main className="wrap">{children}</main>
         <footer className="pe">
           <div className="wrap">
-            Clínica Aberta — projeto de exemplo. Dados cadastrados aqui ficam no banco local do projeto.
+            Agenda Saúde — agendamento das unidades básicas. Em caso de emergência, procure o pronto
+            atendimento ou ligue 192.
           </div>
         </footer>
       </body>

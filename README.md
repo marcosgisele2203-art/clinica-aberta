@@ -1,99 +1,106 @@
-# Clínica Aberta
+# Agenda Saúde
 
-Sistema onde o médico cadastra a clínica, publica a agenda e recebe agendamentos online.
-Três perfis: **paciente**, **médico** e **admin**.
+Agendamento de consultas nas unidades básicas de saúde de um município. O morador marca pelo
+site; a secretaria de saúde cadastra as unidades, define quantas vagas cada uma abre e registra
+quem compareceu.
 
 Stack: Next.js 15 (App Router) · TypeScript · Prisma · Postgres · sessão por cookie assinado
 (jose + bcrypt). Sem Tailwind: o CSS é próprio.
 
-## Subir online sem instalar nada (GitHub → Vercel → Neon)
+## Como funciona
+
+**Morador** — faz um cadastro único com nome, CPF, data de nascimento e, se souber, cartão SUS.
+Depois escolhe a unidade, a especialidade e vê os próximos 21 dias com as vagas que restam em cada
+turno. Confirma e recebe um protocolo para apresentar na recepção. Pode cancelar pelo site, e a
+vaga volta para a fila.
+
+**Secretaria** — cadastra as unidades, abre vagas por especialidade, dia da semana e turno
+("Clínico Geral, segunda a sexta, manhã, 18 vagas"), fecha dias de feriado ou dedetização, e na
+agenda do dia marca quem veio e quem faltou. O painel mostra a procura por unidade e a taxa de
+falta.
+
+### Regras que ficam no servidor, não só na tela
+
+- A vaga é conferida dentro de uma transação isolada: se duas pessoas pegarem a última vaga ao
+  mesmo tempo, só uma confirma e a outra recebe aviso para escolher outro dia.
+- O dia e o turno enviados são conferidos contra as vagas reais da unidade — não adianta forjar
+  uma data em que o posto não atende.
+- Um morador não acumula dois agendamentos futuros da mesma especialidade.
+- Nada é marcado para o mesmo dia: a agenda começa amanhã.
+- As datas usam o fuso do município (`America/Campo_Grande`), não o relógio do servidor. Sem isso,
+  depois das 21h o sistema entenderia que já é o dia seguinte.
+
+## Subir online sem instalar nada
 
 Tudo pelo navegador, sem terminal.
 
-**1. Banco no Neon** — crie uma conta grátis em neon.tech, crie um projeto e copie a
-*connection string* **direct** (a que **não** tem `-pooler` no endereço).
+**1. Banco Postgres** — crie um no seu servidor (Easypanel, Dokploy, Coolify) ou num serviço como
+Neon, e guarde a connection string.
 
-**2. Código no GitHub** — crie um repositório novo e suba os arquivos deste projeto
-(no GitHub: *Add file* → *Upload files* → arraste o conteúdo da pasta).
+**2. Código no GitHub** — este repositório.
 
-**3. Deploy na Vercel** — entre com o GitHub, *Add New…* → *Project*, escolha o repositório e
-antes de clicar em Deploy abra *Environment Variables* e cadastre três:
+**3. Deploy** — aponte a hospedagem para o repositório, build com Nixpacks (ou `npm run build` e
+`npm start`), porta **3000**, e cadastre três variáveis de ambiente:
 
-| Nome          | Valor                                                       |
-| ------------- | ----------------------------------------------------------- |
-| `DATABASE_URL`| a connection string do Neon                                  |
-| `AUTH_SECRET` | qualquer sequência longa e aleatória (uns 40 caracteres)     |
-| `SETUP_TOKEN` | uma senha que só você sabe, usada uma vez na instalação      |
+| Nome           | Valor                                                   |
+| -------------- | ------------------------------------------------------- |
+| `DATABASE_URL` | a connection string do Postgres                          |
+| `AUTH_SECRET`  | sequência longa e aleatória (uns 40 caracteres)          |
+| `SETUP_TOKEN`  | uma senha que só você sabe, usada uma vez na instalação  |
 
-**4. Instalar o banco** — com o deploy pronto, abra `https://seu-projeto.vercel.app/configurar`,
-digite o `SETUP_TOKEN` e confirme. A tela cria as tabelas e carrega os dados de exemplo.
+Opcional: `NEXT_PUBLIC_FUSO` para outro fuso (`America/Sao_Paulo`, por exemplo).
 
-**5. Fechar a porta** — depois que o sistema estiver com dados reais, apague a pasta
-`src/app/configurar` do repositório. A Vercel refaz o deploy sozinha.
+**4. Instalar o banco** — abra `https://seu-endereco/configurar`, digite o `SETUP_TOKEN` e
+confirme. A tela cria as tabelas e carrega unidades de exemplo.
 
-### Contas criadas na instalação
+**5. Fechar a porta** — com dados reais no ar, apague a pasta `src/app/configurar` e o bloco de
+acesso de demonstração em `src/app/entrar/page.tsx`.
 
-| E-mail                       | Senha    | Perfil                       |
-| ---------------------------- | -------- | ---------------------------- |
-| admin@clinicaaberta.com.br   | senha123 | Admin (fila de aprovação)    |
-| helena@corevida.com.br       | senha123 | Médica com agenda preenchida |
-| ana@exemplo.com.br           | senha123 | Paciente                     |
+### Acessos criados na instalação
 
-Os outros médicos usam a mesma senha. Dois deles (Yara e Elias) começam **em análise**, para
-você exercitar a aprovação no painel admin. **Troque essas senhas antes de usar pra valer.**
+| CPF             | Senha    | Perfil     |
+| --------------- | -------- | ---------- |
+| 111.444.777-35  | senha123 | Secretaria |
+| 529.982.247-25  | senha123 | Morador    |
 
-## Rodando na sua máquina (precisa de Node 20+)
+São CPFs de teste, válidos apenas nos dígitos verificadores. **Troque as senhas antes de usar com
+a população.**
+
+## Rodando na sua máquina (Node 20+)
 
 ```bash
 npm install
 cp .env.example .env     # no Windows (PowerShell): copy .env.example .env
-npx prisma db push       # cria as tabelas no banco do DATABASE_URL
-npm run db:seed          # dados de exemplo
+npx prisma db push
+npm run db:seed
 npm run dev
 ```
-
-Abra <http://localhost:3000>.
-
-Para usar SQLite local em vez de Postgres: em `prisma/schema.prisma` troque
-`provider = "postgresql"` por `"sqlite"`, use `DATABASE_URL="file:./dev.db"` e remova os
-`mode: "insensitive"` de `src/app/buscar/page.tsx` (o SQLite não aceita essa opção).
-
-## O que já funciona
-
-- **Paciente** — busca por nome, especialidade, cidade e convênio; página pública da clínica com
-  endereço, valor e convênios; agendamento escolhendo dia e horário. Não precisa de conta para
-  marcar; horário já ocupado ou vencido não aparece disponível.
-- **Médico** — cria conta, preenche o cadastro em 4 passos (CRM, clínica, agenda, plano) e envia
-  para análise. Depois de aprovado, vê a agenda do dia, as próximas consultas e pode cancelar.
-  Enquanto não é aprovado, a página pública fica fora do ar.
-- **Admin** — fila de análise com aprovar/recusar, lista de clínicas com suspender/reativar e os
-  números: cadastros pendentes, clínicas no ar, agendamentos e receita mensal somada pelos planos.
-
-Regras garantidas no servidor, não só na tela: índice único em `(medicoId, data, hora)` impede
-duas pessoas marcarem o mesmo horário; o horário enviado é conferido contra a agenda real do
-médico; cada ação verifica o papel de quem está logado.
 
 ## Estrutura
 
 ```
-prisma/schema.prisma      User, Medico, Consulta
-prisma/seed.ts            carrega os dados de exemplo pelo terminal
-src/lib/db.ts             cliente Prisma
+prisma/schema.prisma      Usuario, Unidade, Disponibilidade, Bloqueio, Agendamento
+src/lib/domain.ts         especialidades, turnos, datas no fuso certo, validação de CPF
+src/lib/schema-sql.ts     a mesma estrutura em SQL puro, usada pela tela /configurar
+src/lib/dados-exemplo.ts  unidades e moradores de demonstração
 src/lib/session.ts        cookie de sessão, usuarioAtual, exigirPapel
-src/lib/domain.ts         especialidades, convênios, geração de horários, formatação
-src/lib/dados-exemplo.ts  os médicos e consultas de demonstração
-src/lib/schema-sql.ts     DDL usada pela tela /configurar
-src/lib/auth-actions.ts   entrar e criar conta
-src/app/                  páginas e server actions por rota
+src/app/unidades          busca de unidades
+src/app/unidade/[slug]    página da unidade e agendamento
+src/app/meus-agendamentos painel do morador
+src/app/secretaria        unidades, vagas, bloqueios e agenda do dia
 ```
 
-Ao mudar `prisma/schema.prisma`, atualize `src/lib/schema-sql.ts` junto — é a cópia em SQL puro
-que a tela de instalação executa.
+Ao mudar `prisma/schema.prisma`, atualize `src/lib/schema-sql.ts` junto.
 
-## Antes de usar pra valer
+## Antes de usar com a população
 
-- Trocar as senhas das contas de exemplo e apagar `src/app/configurar`.
-- Verificação de CRM de verdade (hoje o admin confere a olho).
-- Confirmação por e-mail ou WhatsApp do agendamento.
-- Cobrança dos planos (Pix, Stripe ou similar) — hoje o plano é só um campo no cadastro.
-- Política de privacidade e consentimento: dados de saúde são dados sensíveis na LGPD.
+- **Respaldo da secretaria de saúde.** Se o posto continuar marcando no caderno em paralelo, duas
+  pessoas caem no mesmo turno. A agenda do sistema precisa ser a agenda oficial.
+- **LGPD.** Aqui há dado de saúde ligado a CPF, que é dado pessoal sensível. É preciso base legal,
+  aviso de privacidade e definição de quem acessa o quê, formalizados pela prefeitura.
+- **Confirmação e lembrete por WhatsApp.** Hoje o morador marca e não recebe nada. É o maior
+  buraco, e o que mais reduz falta.
+- **Senha esquecida.** Não existe recuperação; hoje só a secretaria resolveria no banco.
+- **Acesso por unidade.** Hoje só a secretaria entra. Dar login próprio para a recepção de cada
+  posto é o passo seguinte natural.
+- **Fila de espera** quando as vagas acabam, e **bloqueio de quem falta** seguidas vezes.

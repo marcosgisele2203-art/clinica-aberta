@@ -7,77 +7,88 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-// Papéis: PACIENTE, MEDICO, ADMIN (SQLite não tem enum nativo).
-model User {
-  id           String    @id @default(cuid())
+/// Papéis: CIDADAO (morador que agenda) e SECRETARIA (quem administra a rede).
+model Usuario {
+  id           String   @id @default(cuid())
   nome         String
-  email        String    @unique
-  senhaHash    String
+  cpf          String   @unique // somente dígitos
+  cns          String? // cartão SUS, somente dígitos
+  nascimento   String // AAAA-MM-DD
   telefone     String?
-  role         String    @default("PACIENTE")
-  criadoEm     DateTime  @default(now())
-  medico       Medico?
-  agendamentos Consulta[] @relation("ConsultasDoPaciente")
+  senhaHash    String
+  role         String   @default("CIDADAO")
+  criadoEm     DateTime @default(now())
+
+  agendamentos Agendamento[]
 }
 
-// Status da clínica: PENDENTE, APROVADO, RECUSADO, SUSPENSO
-model Medico {
+/// Posto, UBS, unidade mista, centro de especialidades.
+model Unidade {
   id            String   @id @default(cuid())
-  userId        String   @unique
-  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  crm           String
-  crmUf         String
-  especialidade String
-  bio           String   @default("")
-
-  clinica       String
+  nome          String
   slug          String   @unique
-  cep           String
+  tipo          String   @default("UBS")
   endereco      String
   bairro        String
   cidade        String
   uf            String
-
-  // Agenda
-  diasSemana    String   @default("1,2,3,4,5") // 0=domingo … 6=sábado
-  horaInicio    Int      @default(8)
-  horaFim       Int      @default(18)
-  duracaoMin    Int      @default(30)
-  valorCentavos Int      @default(30000)
-  convenios     String   @default("Particular")
-
-  plano         String   @default("Profissional")
-  status        String   @default("PENDENTE")
-  motivoRecusa  String?
+  telefone      String?
+  funcionamento String   @default("Segunda a sexta, das 7h às 17h")
+  observacao    String   @default("")
+  ativa         Boolean  @default(true)
   criadoEm      DateTime @default(now())
-  publicadoEm   DateTime?
 
-  consultas     Consulta[]
+  disponibilidades Disponibilidade[]
+  bloqueios        Bloqueio[]
+  agendamentos     Agendamento[]
 
-  @@index([status, especialidade])
-  @@index([cidade])
+  @@index([cidade, ativa])
 }
 
-// Status da consulta: CONFIRMADA, CANCELADA, ATENDIDA
-model Consulta {
-  id          String   @id @default(cuid())
-  medicoId    String
-  medico      Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+/// Quantas vagas a unidade abre para uma especialidade num dia da semana e turno.
+/// Ex.: Clínico Geral, quinta-feira, manhã, 20 vagas.
+model Disponibilidade {
+  id            String  @id @default(cuid())
+  unidadeId     String
+  unidade       Unidade @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+  especialidade String
+  diaSemana     Int // 0 = domingo … 6 = sábado
+  turno         String // MANHA | TARDE
+  vagas         Int     @default(10)
+  ativa         Boolean @default(true)
 
-  pacienteId  String?
-  paciente    User?    @relation("ConsultasDoPaciente", fields: [pacienteId], references: [id], onDelete: SetNull)
+  @@unique([unidadeId, especialidade, diaSemana, turno])
+  @@index([unidadeId, especialidade])
+}
 
-  nome        String
-  telefone    String
-  convenio    String
-  motivo      String   @default("")
+/// Feriado, dedetização, falta de profissional: fecha a unidade naquele dia.
+model Bloqueio {
+  id        String   @id @default(cuid())
+  unidadeId String
+  unidade   Unidade  @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+  data      String // AAAA-MM-DD
+  motivo    String
+  criadoEm  DateTime @default(now())
 
-  data        String   // AAAA-MM-DD
-  hora        String   // HH:MM
-  status      String   @default("CONFIRMADA")
-  criadaEm    DateTime @default(now())
+  @@unique([unidadeId, data])
+}
 
-  @@unique([medicoId, data, hora])
-  @@index([medicoId, data])
+/// Status: CONFIRMADO, CANCELADO, COMPARECEU, FALTOU.
+model Agendamento {
+  id            String   @id @default(cuid())
+  protocolo     String   @unique
+  unidadeId     String
+  unidade       Unidade  @relation(fields: [unidadeId], references: [id], onDelete: Cascade)
+  cidadaoId     String
+  cidadao       Usuario  @relation(fields: [cidadaoId], references: [id], onDelete: Cascade)
+  especialidade String
+  data          String // AAAA-MM-DD
+  turno         String // MANHA | TARDE
+  status        String   @default("CONFIRMADO")
+  observacao    String   @default("")
+  criadoEm      DateTime @default(now())
+
+  @@index([unidadeId, data, especialidade, turno, status])
+  @@index([cidadaoId, data])
+  @@index([data, status])
 }

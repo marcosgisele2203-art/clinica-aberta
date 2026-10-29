@@ -1,146 +1,212 @@
 import bcrypt from "bcryptjs";
 import type { PrismaClient } from "@prisma/client";
+import { diaDaSemana, gerarProtocolo, iso, proximosDias } from "./domain";
 
 export const SENHA_EXEMPLO = "senha123";
+export const CPF_SECRETARIA = "11144477735"; // CPF de teste, válido nos dígitos verificadores
+export const CPF_CIDADAO = "52998224725";
 
-type Semente = {
+type UnidadeSemente = {
   nome: string;
-  email: string;
-  telefone: string;
-  crm: string;
-  crmUf: string;
-  especialidade: string;
-  clinica: string;
   slug: string;
-  cep: string;
+  tipo: string;
   endereco: string;
   bairro: string;
-  cidade: string;
-  uf: string;
-  diasSemana: string;
-  horaInicio: number;
-  horaFim: number;
-  duracaoMin: number;
-  valorCentavos: number;
-  convenios: string;
-  plano: string;
-  status: string;
-  bio: string;
+  telefone: string;
+  funcionamento: string;
+  observacao: string;
+  /** [especialidade, dias da semana, turnos, vagas] */
+  oferta: [string, number[], string[], number][];
 };
 
-export const MEDICOS_EXEMPLO: Semente[] = [
+export const CIDADE = "Miranda";
+export const UF = "MS";
+
+export const UNIDADES_EXEMPLO: UnidadeSemente[] = [
   {
-    nome: "Dra. Helena Fontes", email: "helena@corevida.com.br", telefone: "(11) 99712-4480",
-    crm: "118423", crmUf: "SP", especialidade: "Cardiologia",
-    clinica: "Cor & Vida Cardiologia", slug: "dra-helena-fontes",
-    cep: "05422-001", endereco: "Rua dos Pinheiros, 1240 — sala 32", bairro: "Pinheiros", cidade: "São Paulo", uf: "SP",
-    diasSemana: "1,2,3,4,5", horaInicio: 8, horaFim: 17, duracaoMin: 30, valorCentavos: 38000,
-    convenios: "Particular,Unimed,SulAmérica", plano: "Profissional", status: "APROVADO",
-    bio: "Cardiologista com foco em prevenção e acompanhamento de hipertensão. Atende com ecocardiograma e teste ergométrico no próprio consultório.",
+    nome: "UBS Centro",
+    slug: "ubs-centro",
+    tipo: "UBS",
+    endereco: "Rua Barão do Rio Branco, 412",
+    bairro: "Centro",
+    telefone: "(67) 3242-1100",
+    funcionamento: "Segunda a sexta, das 7h às 17h",
+    observacao: "Traga documento com foto e o cartão SUS. Jejum de 8 horas para a coleta de exames.",
+    oferta: [
+      ["Clínico Geral", [1, 2, 3, 4, 5], ["MANHA", "TARDE"], 18],
+      ["Pediatria", [2, 4], ["MANHA"], 12],
+      ["Ginecologia e Pré-natal", [3], ["TARDE"], 10],
+      ["Odontologia", [1, 3, 5], ["TARDE"], 8],
+      ["Vacinação", [1, 2, 3, 4, 5], ["MANHA", "TARDE"], 40],
+      ["Coleta de exames", [2, 4], ["MANHA"], 25],
+    ],
   },
   {
-    nome: "Dr. Rogério Vasques", email: "rogerio@pantanalortopedia.com.br", telefone: "(67) 98814-2290",
-    crm: "9212", crmUf: "MS", especialidade: "Ortopedia",
-    clinica: "Instituto Pantanal de Ortopedia", slug: "dr-rogerio-vasques",
-    cep: "79002-072", endereco: "Av. Afonso Pena, 3570 — 4º andar", bairro: "Centro", cidade: "Campo Grande", uf: "MS",
-    diasSemana: "1,3,5", horaInicio: 9, horaFim: 16, duracaoMin: 40, valorCentavos: 29000,
-    convenios: "Particular,Unimed,Amil", plano: "Essencial", status: "APROVADO",
-    bio: "Ortopedista de joelho e quadril. Atende lesões esportivas e faz infiltração guiada por ultrassom.",
+    nome: "UBS Vila Nova",
+    slug: "ubs-vila-nova",
+    tipo: "ESF",
+    endereco: "Rua Projetada A, 77",
+    bairro: "Vila Nova",
+    telefone: "(67) 3242-1180",
+    funcionamento: "Segunda a sexta, das 7h às 16h",
+    observacao: "Equipe de saúde da família. Visita domiciliar às sextas à tarde.",
+    oferta: [
+      ["Clínico Geral", [1, 2, 3, 4, 5], ["MANHA"], 15],
+      ["Enfermagem", [1, 2, 3, 4, 5], ["MANHA", "TARDE"], 20],
+      ["Vacinação", [1, 3, 5], ["MANHA"], 30],
+      ["Pediatria", [3], ["TARDE"], 10],
+    ],
   },
   {
-    nome: "Dra. Marina Okada", email: "marina@peleclara.com.br", telefone: "(41) 99630-1177",
-    crm: "42880", crmUf: "PR", especialidade: "Dermatologia",
-    clinica: "Pele Clara Dermatologia", slug: "dra-marina-okada",
-    cep: "80420-000", endereco: "Rua Comendador Araújo, 410 — conj. 7", bairro: "Batel", cidade: "Curitiba", uf: "PR",
-    diasSemana: "2,3,4,5,6", horaInicio: 10, horaFim: 19, duracaoMin: 30, valorCentavos: 42000,
-    convenios: "Particular,Bradesco Saúde", plano: "Clínica", status: "APROVADO",
-    bio: "Dermatologia clínica e cirúrgica. Mapeamento de pintas por dermatoscopia digital e tratamento de acne.",
+    nome: "Unidade Mista de Saúde",
+    slug: "unidade-mista",
+    tipo: "Unidade Mista",
+    endereco: "Avenida Afonso Pena, 1500",
+    bairro: "Santa Luzia",
+    telefone: "(67) 3242-1255",
+    funcionamento: "Todos os dias, 24 horas (agendamento só para consultas eletivas)",
+    observacao: "O pronto atendimento é por ordem de chegada e não entra no agendamento.",
+    oferta: [
+      ["Clínico Geral", [1, 2, 3, 4, 5], ["MANHA", "TARDE"], 22],
+      ["Ginecologia e Pré-natal", [2, 4], ["MANHA"], 14],
+      ["Coleta de exames", [1, 2, 3, 4, 5], ["MANHA"], 35],
+      ["Fisioterapia", [1, 3, 5], ["TARDE"], 12],
+    ],
   },
   {
-    nome: "Dr. Caio Brandão", email: "caio@consultoriocaio.com.br", telefone: "(71) 99145-7731",
-    crm: "27105", crmUf: "BA", especialidade: "Pediatria",
-    clinica: "Consultório Pediátrico Caio Brandão", slug: "dr-caio-brandao",
-    cep: "41940-360", endereco: "Rua da Paciência, 215 — sala 2", bairro: "Rio Vermelho", cidade: "Salvador", uf: "BA",
-    diasSemana: "1,2,4,5", horaInicio: 8, horaFim: 15, duracaoMin: 30, valorCentavos: 26000,
-    convenios: "Particular,Unimed,NotreDame Intermédica", plano: "Essencial", status: "APROVADO",
-    bio: "Puericultura do recém-nascido ao adolescente, com consulta de acolhimento para mães de primeira viagem.",
-  },
-  {
-    nome: "Dra. Yara Nogueira", email: "yara@espacoyara.com.br", telefone: "(67) 99902-3344",
-    crm: "11407", crmUf: "MS", especialidade: "Ginecologia",
-    clinica: "Espaço Yara Saúde da Mulher", slug: "dra-yara-nogueira",
-    cep: "79380-000", endereco: "Rua Barão do Rio Branco, 88", bairro: "Centro", cidade: "Miranda", uf: "MS",
-    diasSemana: "1,2,3,4", horaInicio: 13, horaFim: 19, duracaoMin: 40, valorCentavos: 30000,
-    convenios: "Particular,Unimed", plano: "Profissional", status: "PENDENTE",
-    bio: "Ginecologia e obstetrícia, pré-natal de baixo risco e planejamento familiar.",
-  },
-  {
-    nome: "Dr. Elias Monteiro", email: "elias@nucleomonteiro.com.br", telefone: "(21) 98477-0912",
-    crm: "88740", crmUf: "RJ", especialidade: "Psiquiatria",
-    clinica: "Núcleo Monteiro", slug: "dr-elias-monteiro",
-    cep: "24220-000", endereco: "Rua Gavião Peixoto, 90 — sala 1105", bairro: "Icaraí", cidade: "Niterói", uf: "RJ",
-    diasSemana: "1,2,3,4,5", horaInicio: 14, horaFim: 20, duracaoMin: 50, valorCentavos: 45000,
-    convenios: "Particular", plano: "Profissional", status: "PENDENTE",
-    bio: "Psiquiatria adulta, transtornos de ansiedade e humor. Primeira consulta de 50 minutos.",
+    nome: "Centro de Especialidades",
+    slug: "centro-especialidades",
+    tipo: "Centro de Especialidades",
+    endereco: "Rua Dom Aquino, 230",
+    bairro: "Centro",
+    telefone: "(67) 3242-1310",
+    funcionamento: "Segunda a sexta, das 7h às 13h",
+    observacao: "Atendimento mediante encaminhamento da unidade de origem.",
+    oferta: [
+      ["Odontologia", [1, 2, 3, 4, 5], ["MANHA"], 14],
+      ["Psicologia", [2, 4], ["MANHA"], 8],
+      ["Nutrição", [3], ["MANHA"], 10],
+      ["Fisioterapia", [1, 2, 3, 4, 5], ["MANHA"], 16],
+    ],
   },
 ];
 
-function iso(d: Date) {
-  return [d.getFullYear(), String(d.getMonth() + 1).padStart(2, "0"), String(d.getDate()).padStart(2, "0")].join("-");
-}
+const CIDADAOS_EXEMPLO = [
+  { nome: "Ana Lúcia Prado", cpf: CPF_CIDADAO, cns: "700500000000001", nascimento: "1986-04-12", telefone: "(67) 99902-1144" },
+  { nome: "Sebastião Reis", cpf: "16899535009", cns: "700500000000002", nascimento: "1954-09-03", telefone: "(67) 99814-7720" },
+  { nome: "Dulce Ferraz", cpf: "90277900867", cns: "700500000000003", nascimento: "1991-12-20", telefone: "(67) 99630-5512" },
+];
 
-/** Apaga tudo e recria os dados de demonstração. */
 export async function popularBanco(db: PrismaClient) {
   const senhaHash = await bcrypt.hash(SENHA_EXEMPLO, 10);
 
-  await db.consulta.deleteMany({});
-  await db.medico.deleteMany({});
-  await db.user.deleteMany({});
+  await db.agendamento.deleteMany({});
+  await db.bloqueio.deleteMany({});
+  await db.disponibilidade.deleteMany({});
+  await db.unidade.deleteMany({});
+  await db.usuario.deleteMany({});
 
-  await db.user.create({
-    data: { nome: "Equipe Clínica Aberta", email: "admin@clinicaaberta.com.br", senhaHash, role: "ADMIN" },
-  });
-
-  const paciente = await db.user.create({
+  await db.usuario.create({
     data: {
-      nome: "Ana Lúcia Prado", email: "ana@exemplo.com.br", senhaHash,
-      telefone: "(11) 98822-1109", role: "PACIENTE",
+      nome: "Secretaria Municipal de Saúde",
+      cpf: CPF_SECRETARIA,
+      nascimento: "1990-01-01",
+      telefone: "(67) 3242-1000",
+      senhaHash,
+      role: "SECRETARIA",
     },
   });
 
-  for (const m of MEDICOS_EXEMPLO) {
-    const user = await db.user.create({
-      data: { nome: m.nome, email: m.email, senhaHash, telefone: m.telefone, role: "MEDICO" },
-    });
-    await db.medico.create({
-      data: {
-        userId: user.id,
-        crm: m.crm, crmUf: m.crmUf, especialidade: m.especialidade, bio: m.bio,
-        clinica: m.clinica, slug: m.slug, cep: m.cep, endereco: m.endereco,
-        bairro: m.bairro, cidade: m.cidade, uf: m.uf,
-        diasSemana: m.diasSemana, horaInicio: m.horaInicio, horaFim: m.horaFim,
-        duracaoMin: m.duracaoMin, valorCentavos: m.valorCentavos, convenios: m.convenios,
-        plano: m.plano, status: m.status,
-        publicadoEm: m.status === "APROVADO" ? new Date() : null,
-      },
-    });
+  const cidadaos = [];
+  for (const c of CIDADAOS_EXEMPLO) {
+    cidadaos.push(
+      await db.usuario.create({
+        data: { ...c, senhaHash, role: "CIDADAO" },
+      })
+    );
   }
 
-  // Consultas na agenda da Dra. Helena, para o painel do médico abrir com conteúdo.
-  const helena = await db.medico.findUnique({ where: { slug: "dra-helena-fontes" } });
-  if (helena) {
-    const agora = new Date();
-    const amanha = new Date(agora.getFullYear(), agora.getMonth(), agora.getDate() + 1);
-    const agenda = [
-      { data: iso(agora), hora: "09:00", nome: "Ana Lúcia Prado", telefone: "(11) 98822-1109", convenio: "Unimed", pacienteId: paciente.id },
-      { data: iso(agora), hora: "10:30", nome: "Sebastião Reis", telefone: "(11) 99100-4412", convenio: "Particular", pacienteId: null },
-      { data: iso(agora), hora: "14:00", nome: "Marcos Vinícius Lima", telefone: "(11) 99654-2231", convenio: "SulAmérica", pacienteId: null },
-      { data: iso(amanha), hora: "08:30", nome: "Dulce Ferraz", telefone: "(11) 98123-7760", convenio: "Unimed", pacienteId: null },
-    ];
-    for (const c of agenda) {
-      await db.consulta.create({ data: { medicoId: helena.id, ...c, motivo: "", status: "CONFIRMADA" } });
+  const unidades = [];
+  for (const u of UNIDADES_EXEMPLO) {
+    const unidade = await db.unidade.create({
+      data: {
+        nome: u.nome,
+        slug: u.slug,
+        tipo: u.tipo,
+        endereco: u.endereco,
+        bairro: u.bairro,
+        cidade: CIDADE,
+        uf: UF,
+        telefone: u.telefone,
+        funcionamento: u.funcionamento,
+        observacao: u.observacao,
+        ativa: true,
+      },
+    });
+    unidades.push(unidade);
+
+    for (const [especialidade, dias, turnos, vagas] of u.oferta) {
+      for (const diaSemana of dias) {
+        for (const turno of turnos) {
+          await db.disponibilidade.create({
+            data: { unidadeId: unidade.id, especialidade, diaSemana, turno, vagas, ativa: true },
+          });
+        }
+      }
     }
   }
 
-  return { medicos: MEDICOS_EXEMPLO.length, consultas: 4 };
+  // Um feriado de exemplo, para a secretaria ver como o bloqueio aparece.
+  const daquiDuasSemanas = proximosDias(1, 14)[0];
+  await db.bloqueio.create({
+    data: {
+      unidadeId: unidades[0].id,
+      data: daquiDuasSemanas,
+      motivo: "Dedetização da unidade",
+    },
+  });
+
+  // Alguns agendamentos já marcados, para o painel não abrir vazio.
+  const dias = proximosDias(6, 1);
+  const marcados: { unidade: number; esp: string; turno: string; dia: number; cidadao: number }[] = [
+    { unidade: 0, esp: "Clínico Geral", turno: "MANHA", dia: 0, cidadao: 0 },
+    { unidade: 0, esp: "Clínico Geral", turno: "MANHA", dia: 0, cidadao: 1 },
+    { unidade: 0, esp: "Odontologia", turno: "TARDE", dia: 1, cidadao: 2 },
+    { unidade: 1, esp: "Enfermagem", turno: "MANHA", dia: 1, cidadao: 0 },
+    { unidade: 2, esp: "Coleta de exames", turno: "MANHA", dia: 2, cidadao: 1 },
+  ];
+
+  let criados = 0;
+  for (const m of marcados) {
+    const data = dias[m.dia];
+    const diaSemana = diaDaSemana(data);
+    const existe = await db.disponibilidade.findFirst({
+      where: {
+        unidadeId: unidades[m.unidade].id,
+        especialidade: m.esp,
+        diaSemana,
+        turno: m.turno,
+        ativa: true,
+      },
+    });
+    if (!existe) continue; // a data caiu num dia em que a unidade não abre essa especialidade
+    await db.agendamento.create({
+      data: {
+        protocolo: gerarProtocolo(),
+        unidadeId: unidades[m.unidade].id,
+        cidadaoId: cidadaos[m.cidadao].id,
+        especialidade: m.esp,
+        data,
+        turno: m.turno,
+        status: "CONFIRMADO",
+      },
+    });
+    criados++;
+  }
+
+  return { unidades: unidades.length, agendamentos: criados, cidadaos: cidadaos.length };
+}
+
+export function dataDeHoje() {
+  return iso(new Date());
 }

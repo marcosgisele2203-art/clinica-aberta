@@ -5,10 +5,11 @@ const db = new PrismaClient();
 
 popularBanco(db)
   .then((r) => {
-    console.log(`Banco populado: ${r.medicos} médicos, ${r.consultas} consultas.`);
-    console.log(`  admin@clinicaaberta.com.br  /  ${SENHA_EXEMPLO}   (admin)`);
-    console.log(`  helena@corevida.com.br      /  ${SENHA_EXEMPLO}   (médica com agenda cheia)`);
-    console.log(`  ana@exemplo.com.br          /  ${SENHA_EXEMPLO}   (paciente)`);
+    console.log(
+      `Banco populado: ${r.unidades} unidades, ${r.cidadaos} moradores, ${r.agendamentos} agendamentos.`
+    );
+    console.log(`  111.444.777-35  /  ${SENHA_EXEMPLO}   (secretaria)`);
+    console.log(`  529.982.247-25  /  ${SENHA_EXEMPLO}   (morador)`);
   })
   .catch((e) => {
     console.error(e);

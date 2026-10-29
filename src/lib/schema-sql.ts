@@ -1,74 +1,83 @@
 /**
  * DDL equivalente a prisma/schema.prisma, em Postgres.
  *
- * Serve só para a tela /configurar criar as tabelas direto do navegador, no deploy,
+ * Serve para a tela /configurar criar as tabelas direto do navegador, no primeiro deploy,
  * sem precisar rodar `prisma db push` num terminal. Quem roda o projeto localmente
  * continua usando o Prisma normalmente.
  *
  * Ao mudar o schema.prisma, mude estas instruções junto.
  */
 export const SQL_CRIAR_TABELAS: string[] = [
-  `CREATE TABLE IF NOT EXISTS "User" (
+  `CREATE TABLE IF NOT EXISTS "Usuario" (
      "id" TEXT PRIMARY KEY,
      "nome" TEXT NOT NULL,
-     "email" TEXT NOT NULL,
-     "senhaHash" TEXT NOT NULL,
+     "cpf" TEXT NOT NULL,
+     "cns" TEXT,
+     "nascimento" TEXT NOT NULL,
      "telefone" TEXT,
-     "role" TEXT NOT NULL DEFAULT 'PACIENTE',
+     "senhaHash" TEXT NOT NULL,
+     "role" TEXT NOT NULL DEFAULT 'CIDADAO',
      "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Usuario_cpf_key" ON "Usuario" ("cpf")`,
 
-  `CREATE UNIQUE INDEX IF NOT EXISTS "User_email_key" ON "User" ("email")`,
-
-  `CREATE TABLE IF NOT EXISTS "Medico" (
+  `CREATE TABLE IF NOT EXISTS "Unidade" (
      "id" TEXT PRIMARY KEY,
-     "userId" TEXT NOT NULL,
-     "crm" TEXT NOT NULL,
-     "crmUf" TEXT NOT NULL,
-     "especialidade" TEXT NOT NULL,
-     "bio" TEXT NOT NULL DEFAULT '',
-     "clinica" TEXT NOT NULL,
+     "nome" TEXT NOT NULL,
      "slug" TEXT NOT NULL,
-     "cep" TEXT NOT NULL,
+     "tipo" TEXT NOT NULL DEFAULT 'UBS',
      "endereco" TEXT NOT NULL,
      "bairro" TEXT NOT NULL,
      "cidade" TEXT NOT NULL,
      "uf" TEXT NOT NULL,
-     "diasSemana" TEXT NOT NULL DEFAULT '1,2,3,4,5',
-     "horaInicio" INTEGER NOT NULL DEFAULT 8,
-     "horaFim" INTEGER NOT NULL DEFAULT 18,
-     "duracaoMin" INTEGER NOT NULL DEFAULT 30,
-     "valorCentavos" INTEGER NOT NULL DEFAULT 30000,
-     "convenios" TEXT NOT NULL DEFAULT 'Particular',
-     "plano" TEXT NOT NULL DEFAULT 'Profissional',
-     "status" TEXT NOT NULL DEFAULT 'PENDENTE',
-     "motivoRecusa" TEXT,
-     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-     "publicadoEm" TIMESTAMP(3),
-     CONSTRAINT "Medico_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+     "telefone" TEXT,
+     "funcionamento" TEXT NOT NULL DEFAULT 'Segunda a sexta, das 7h às 17h',
+     "observacao" TEXT NOT NULL DEFAULT '',
+     "ativa" BOOLEAN NOT NULL DEFAULT true,
+     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Unidade_slug_key" ON "Unidade" ("slug")`,
+  `CREATE INDEX IF NOT EXISTS "Unidade_cidade_ativa_idx" ON "Unidade" ("cidade", "ativa")`,
 
-  `CREATE UNIQUE INDEX IF NOT EXISTS "Medico_userId_key" ON "Medico" ("userId")`,
-  `CREATE UNIQUE INDEX IF NOT EXISTS "Medico_slug_key" ON "Medico" ("slug")`,
-  `CREATE INDEX IF NOT EXISTS "Medico_status_especialidade_idx" ON "Medico" ("status", "especialidade")`,
-  `CREATE INDEX IF NOT EXISTS "Medico_cidade_idx" ON "Medico" ("cidade")`,
-
-  `CREATE TABLE IF NOT EXISTS "Consulta" (
+  `CREATE TABLE IF NOT EXISTS "Disponibilidade" (
      "id" TEXT PRIMARY KEY,
-     "medicoId" TEXT NOT NULL,
-     "pacienteId" TEXT,
-     "nome" TEXT NOT NULL,
-     "telefone" TEXT NOT NULL,
-     "convenio" TEXT NOT NULL,
-     "motivo" TEXT NOT NULL DEFAULT '',
-     "data" TEXT NOT NULL,
-     "hora" TEXT NOT NULL,
-     "status" TEXT NOT NULL DEFAULT 'CONFIRMADA',
-     "criadaEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-     CONSTRAINT "Consulta_medicoId_fkey" FOREIGN KEY ("medicoId") REFERENCES "Medico" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
-     CONSTRAINT "Consulta_pacienteId_fkey" FOREIGN KEY ("pacienteId") REFERENCES "User" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+     "unidadeId" TEXT NOT NULL,
+     "especialidade" TEXT NOT NULL,
+     "diaSemana" INTEGER NOT NULL,
+     "turno" TEXT NOT NULL,
+     "vagas" INTEGER NOT NULL DEFAULT 10,
+     "ativa" BOOLEAN NOT NULL DEFAULT true,
+     CONSTRAINT "Disponibilidade_unidadeId_fkey" FOREIGN KEY ("unidadeId") REFERENCES "Unidade" ("id") ON DELETE CASCADE ON UPDATE CASCADE
    )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Disponibilidade_unidadeId_especialidade_diaSemana_turno_key" ON "Disponibilidade" ("unidadeId", "especialidade", "diaSemana", "turno")`,
+  `CREATE INDEX IF NOT EXISTS "Disponibilidade_unidadeId_especialidade_idx" ON "Disponibilidade" ("unidadeId", "especialidade")`,
 
-  `CREATE UNIQUE INDEX IF NOT EXISTS "Consulta_medicoId_data_hora_key" ON "Consulta" ("medicoId", "data", "hora")`,
-  `CREATE INDEX IF NOT EXISTS "Consulta_medicoId_data_idx" ON "Consulta" ("medicoId", "data")`,
+  `CREATE TABLE IF NOT EXISTS "Bloqueio" (
+     "id" TEXT PRIMARY KEY,
+     "unidadeId" TEXT NOT NULL,
+     "data" TEXT NOT NULL,
+     "motivo" TEXT NOT NULL,
+     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     CONSTRAINT "Bloqueio_unidadeId_fkey" FOREIGN KEY ("unidadeId") REFERENCES "Unidade" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Bloqueio_unidadeId_data_key" ON "Bloqueio" ("unidadeId", "data")`,
+
+  `CREATE TABLE IF NOT EXISTS "Agendamento" (
+     "id" TEXT PRIMARY KEY,
+     "protocolo" TEXT NOT NULL,
+     "unidadeId" TEXT NOT NULL,
+     "cidadaoId" TEXT NOT NULL,
+     "especialidade" TEXT NOT NULL,
+     "data" TEXT NOT NULL,
+     "turno" TEXT NOT NULL,
+     "status" TEXT NOT NULL DEFAULT 'CONFIRMADO',
+     "observacao" TEXT NOT NULL DEFAULT '',
+     "criadoEm" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+     CONSTRAINT "Agendamento_unidadeId_fkey" FOREIGN KEY ("unidadeId") REFERENCES "Unidade" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+     CONSTRAINT "Agendamento_cidadaoId_fkey" FOREIGN KEY ("cidadaoId") REFERENCES "Usuario" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+   )`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS "Agendamento_protocolo_key" ON "Agendamento" ("protocolo")`,
+  `CREATE INDEX IF NOT EXISTS "Agendamento_unidade_data_esp_turno_status_idx" ON "Agendamento" ("unidadeId", "data", "especialidade", "turno", "status")`,
+  `CREATE INDEX IF NOT EXISTS "Agendamento_cidadaoId_data_idx" ON "Agendamento" ("cidadaoId", "data")`,
+  `CREATE INDEX IF NOT EXISTS "Agendamento_data_status_idx" ON "Agendamento" ("data", "status")`,
 ];

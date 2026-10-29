@@ -3,10 +3,10 @@ import { redirect } from "next/navigation";
 import { SignJWT, jwtVerify } from "jose";
 import { db } from "./db";
 
-const COOKIE = "ca_sessao";
+const COOKIE = "agenda_sessao";
 const DIAS = 7;
 
-export type Papel = "PACIENTE" | "MEDICO" | "ADMIN";
+export type Papel = "CIDADAO" | "SECRETARIA";
 export type Sessao = { uid: string; role: Papel; nome: string };
 
 function chave() {
@@ -47,7 +47,11 @@ export async function sessaoAtual(): Promise<Sessao | null> {
   try {
     const { payload } = await jwtVerify(token, chave());
     if (!payload.uid || !payload.role) return null;
-    return { uid: String(payload.uid), role: payload.role as Papel, nome: String(payload.nome ?? "") };
+    return {
+      uid: String(payload.uid),
+      role: payload.role as Papel,
+      nome: String(payload.nome ?? ""),
+    };
   } catch {
     return null;
   }
@@ -56,13 +60,16 @@ export async function sessaoAtual(): Promise<Sessao | null> {
 export async function usuarioAtual() {
   const sessao = await sessaoAtual();
   if (!sessao) return null;
-  return db.user.findUnique({ where: { id: sessao.uid }, include: { medico: true } });
+  return db.usuario.findUnique({ where: { id: sessao.uid } });
 }
 
-/** Garante que há alguém logado com um dos papéis; caso contrário manda para o login. */
-export async function exigirPapel(papeis: Papel[], destino = "/entrar") {
+/** Exige alguém logado com um dos papéis; caso contrário manda para o login. */
+export async function exigirPapel(papeis: Papel[], voltarPara?: string) {
   const usuario = await usuarioAtual();
-  if (!usuario) redirect(`${destino}?proximo=${encodeURIComponent("/")}`);
+  if (!usuario) {
+    const destino = voltarPara ? `/entrar?proximo=${encodeURIComponent(voltarPara)}` : "/entrar";
+    redirect(destino);
+  }
   if (!papeis.includes(usuario.role as Papel)) redirect("/");
   return usuario;
 }

@@ -1,56 +1,45 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState } from "react";
 import { criarConta, type EstadoAuth } from "@/lib/auth-actions";
 
-export default function FormularioConta({ papelInicial }: { papelInicial: "PACIENTE" | "MEDICO" }) {
-  const [papel, setPapel] = useState(papelInicial);
+export default function FormularioConta({ proximo }: { proximo: string }) {
   const [estado, enviar, enviando] = useActionState<EstadoAuth, FormData>(criarConta, {});
 
   return (
     <form action={enviar} className="card grid" style={{ gap: 14 }}>
-      <input type="hidden" name="papel" value={papel} />
-      <div>
-        <p className="eyebrow">Tipo de conta</p>
-        <div className="chips" style={{ marginTop: 8 }}>
-          <button
-            type="button"
-            className="chip"
-            aria-pressed={papel === "PACIENTE"}
-            onClick={() => setPapel("PACIENTE")}
-          >
-            Sou paciente
-          </button>
-          <button
-            type="button"
-            className="chip"
-            aria-pressed={papel === "MEDICO"}
-            onClick={() => setPapel("MEDICO")}
-          >
-            Sou médico
-          </button>
-        </div>
-      </div>
+      <input type="hidden" name="proximo" value={proximo} />
       <label className="f">
         Nome completo
-        <input name="nome" required autoComplete="name" />
+        <input name="nome" required autoComplete="name" placeholder="Como está no documento" />
       </label>
       <label className="f">
-        E-mail
-        <input name="email" type="email" required autoComplete="email" />
+        CPF
+        <input name="cpf" required inputMode="numeric" placeholder="000.000.000-00" />
       </label>
       <label className="f">
-        Telefone
-        <input name="telefone" placeholder="(00) 00000-0000" autoComplete="tel" />
+        Data de nascimento
+        <input name="nascimento" type="date" required />
       </label>
       <label className="f">
-        Senha
-        <input name="senha" type="password" required minLength={8} autoComplete="new-password" />
+        Cartão SUS (se souber)
+        <input name="cns" inputMode="numeric" placeholder="15 números" />
+      </label>
+      <label className="f">
+        Telefone com WhatsApp
+        <input name="telefone" inputMode="tel" placeholder="(00) 00000-0000" autoComplete="tel" />
+      </label>
+      <label className="f">
+        Crie uma senha
+        <input name="senha" type="password" required minLength={6} autoComplete="new-password" />
       </label>
       {estado.erro && <p className="erro">{estado.erro}</p>}
       <button className="btn" type="submit" disabled={enviando}>
-        {enviando ? "Criando…" : "Criar conta"}
+        {enviando ? "Cadastrando…" : "Criar cadastro"}
       </button>
+      <p className="small muted">
+        Seus dados são usados só para o agendamento na rede municipal de saúde.
+      </p>
     </form>
   );
 }
