@@ -1,0 +1,83 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// Papéis: PACIENTE, MEDICO, ADMIN (SQLite não tem enum nativo).
+model User {
+  id           String    @id @default(cuid())
+  nome         String
+  email        String    @unique
+  senhaHash    String
+  telefone     String?
+  role         String    @default("PACIENTE")
+  criadoEm     DateTime  @default(now())
+  medico       Medico?
+  agendamentos Consulta[] @relation("ConsultasDoPaciente")
+}
+
+// Status da clínica: PENDENTE, APROVADO, RECUSADO, SUSPENSO
+model Medico {
+  id            String   @id @default(cuid())
+  userId        String   @unique
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  crm           String
+  crmUf         String
+  especialidade String
+  bio           String   @default("")
+
+  clinica       String
+  slug          String   @unique
+  cep           String
+  endereco      String
+  bairro        String
+  cidade        String
+  uf            String
+
+  // Agenda
+  diasSemana    String   @default("1,2,3,4,5") // 0=domingo … 6=sábado
+  horaInicio    Int      @default(8)
+  horaFim       Int      @default(18)
+  duracaoMin    Int      @default(30)
+  valorCentavos Int      @default(30000)
+  convenios     String   @default("Particular")
+
+  plano         String   @default("Profissional")
+  status        String   @default("PENDENTE")
+  motivoRecusa  String?
+  criadoEm      DateTime @default(now())
+  publicadoEm   DateTime?
+
+  consultas     Consulta[]
+
+  @@index([status, especialidade])
+  @@index([cidade])
+}
+
+// Status da consulta: CONFIRMADA, CANCELADA, ATENDIDA
+model Consulta {
+  id          String   @id @default(cuid())
+  medicoId    String
+  medico      Medico   @relation(fields: [medicoId], references: [id], onDelete: Cascade)
+
+  pacienteId  String?
+  paciente    User?    @relation("ConsultasDoPaciente", fields: [pacienteId], references: [id], onDelete: SetNull)
+
+  nome        String
+  telefone    String
+  convenio    String
+  motivo      String   @default("")
+
+  data        String   // AAAA-MM-DD
+  hora        String   // HH:MM
+  status      String   @default("CONFIRMADA")
+  criadaEm    DateTime @default(now())
+
+  @@unique([medicoId, data, hora])
+  @@index([medicoId, data])
+}
