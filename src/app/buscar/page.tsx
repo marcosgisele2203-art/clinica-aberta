@@ -18,14 +18,19 @@ export default async function Buscar({
       ...(esp ? { especialidade: esp } : {}),
       ...(convenio ? { convenios: { contains: convenio } } : {}),
       ...(cidade
-        ? { OR: [{ cidade: { contains: cidade } }, { uf: { contains: cidade.toUpperCase() } }] }
+        ? {
+            OR: [
+              { cidade: { contains: cidade, mode: "insensitive" as const } },
+              { uf: { equals: cidade.toUpperCase() } },
+            ],
+          }
         : {}),
       ...(termo
         ? {
             OR: [
-              { clinica: { contains: termo } },
-              { especialidade: { contains: termo } },
-              { user: { nome: { contains: termo } } },
+              { clinica: { contains: termo, mode: "insensitive" as const } },
+              { especialidade: { contains: termo, mode: "insensitive" as const } },
+              { user: { nome: { contains: termo, mode: "insensitive" as const } } },
             ],
           }
         : {}),
