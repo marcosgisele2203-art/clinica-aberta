@@ -3,6 +3,10 @@ import { db } from "@/lib/db";
 import { CartaoMedico } from "@/components/ui";
 import { CONVENIOS, ESPECIALIDADES, PLANOS, brl } from "@/lib/domain";
 
+// Lê o banco a cada acesso: nada de consultar na hora do build, quando as tabelas
+// ainda podem não existir.
+export const dynamic = "force-dynamic";
+
 export default async function Inicio() {
   const destaques = await db.medico.findMany({
     where: { status: "APROVADO" },

@@ -3,6 +3,8 @@ import { db } from "@/lib/db";
 import { CartaoMedico } from "@/components/ui";
 import { CONVENIOS, ESPECIALIDADES } from "@/lib/domain";
 
+export const dynamic = "force-dynamic";
+
 type Busca = { termo?: string; esp?: string; cidade?: string; convenio?: string };
 
 export default async function Buscar({
