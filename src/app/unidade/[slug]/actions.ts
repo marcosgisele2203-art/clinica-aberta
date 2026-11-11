@@ -3,15 +3,14 @@
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { sessaoAtual } from "@/lib/session";
-import { diaDaSemana, gerarProtocolo, hoje } from "@/lib/domain";
+import { hoje } from "@/lib/domain";
+import { reservarVaga } from "@/lib/agendamento";
 
 export type EstadoAgendamento = {
   erro?: string;
   precisaEntrar?: boolean;
   ok?: { protocolo: string; data: string; turno: string; unidade: string; especialidade: string };
 };
-
-const ATIVOS = ["CONFIRMADO", "COMPARECEU"];
 
 export async function agendar(
   _anterior: EstadoAgendamento,
@@ -35,61 +34,14 @@ export async function agendar(
   if (!unidade || !unidade.ativa) return { erro: "Esta unidade não está disponível." };
 
   try {
-    const protocolo = await db.$transaction(
-      async (tx) => {
-        const disponibilidade = await tx.disponibilidade.findFirst({
-          where: {
-            unidadeId: unidade.id,
-            especialidade,
-            diaSemana: diaDaSemana(data),
-            turno,
-            ativa: true,
-          },
-        });
-        if (!disponibilidade) throw new Error("SEM_ATENDIMENTO");
-
-        const bloqueio = await tx.bloqueio.findFirst({
-          where: { unidadeId: unidade.id, data },
-        });
-        if (bloqueio) throw new Error("BLOQUEADO");
-
-        const jaMarcou = await tx.agendamento.findFirst({
-          where: {
-            cidadaoId: sessao.uid,
-            especialidade,
-            status: "CONFIRMADO",
-            data: { gte: hoje() },
-          },
-        });
-        if (jaMarcou) throw new Error("JA_MARCOU");
-
-        const ocupadas = await tx.agendamento.count({
-          where: {
-            unidadeId: unidade.id,
-            especialidade,
-            data,
-            turno,
-            status: { in: ATIVOS },
-          },
-        });
-        if (ocupadas >= disponibilidade.vagas) throw new Error("SEM_VAGA");
-
-        const criado = await tx.agendamento.create({
-          data: {
-            protocolo: gerarProtocolo(),
-            unidadeId: unidade.id,
-            cidadaoId: sessao.uid,
-            especialidade,
-            data,
-            turno,
-            observacao,
-            status: "CONFIRMADO",
-          },
-        });
-        return criado.protocolo;
-      },
-      { isolationLevel: "Serializable" }
-    );
+    const protocolo = await reservarVaga(db, {
+      unidadeId: unidade.id,
+      cidadaoId: sessao.uid,
+      especialidade,
+      data,
+      turno,
+      observacao,
+    });
 
     revalidatePath(`/unidade/${slug}`);
     revalidatePath("/meus-agendamentos");
