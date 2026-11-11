@@ -1,0 +1,28 @@
+# Confere tipos e compila o site a cada Pull Request e a cada envio para a main.
+# (O projeto ainda não tem testes automáticos; este passo garante ao menos que o build não quebra.)
+name: Build
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      # valores falsos, só para o build; o banco não é acessado aqui
+      DATABASE_URL: postgres://usuario:senha@127.0.0.1:5432/build
+      AUTH_SECRET: somente-para-o-build-do-ci-nao-usar-em-producao
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx prisma generate
+      - name: Conferir tipos (TypeScript)
+        run: npx tsc --noEmit
+      - run: npm run build
