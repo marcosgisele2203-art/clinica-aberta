@@ -76,6 +76,18 @@ npm run db:seed
 npm run dev
 ```
 
+### Testes
+
+Regras de datas e documentos rodam sem banco. A disputa pela última vaga precisa de um Postgres
+**descartável** (nunca o de produção):
+
+```bash
+DATABASE_URL=postgresql://.../banco_de_teste npx prisma db push
+DATABASE_URL=postgresql://.../banco_de_teste npm test
+```
+
+Sem `DATABASE_URL`, os testes de vaga são pulados. O GitHub roda tudo sozinho em cada Pull Request.
+
 ## Estrutura
 
 ```
